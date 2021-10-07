@@ -36,7 +36,7 @@ Then you can write below code in C# for code generation:
 partial class TestLibrary { }
 ```
 
-To use generated code, for example, calling to `test1`:
+To use the generated code, for example, calling to `test1`:
 
 ```csharp
 TestLibrary.Test1();
