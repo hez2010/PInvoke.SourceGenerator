@@ -135,8 +135,8 @@ namespace {ns}
             RedirectStandardOutput = true,
             UseShellExecute = false
         });
-        process.WaitForExit();
         var output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
         foreach (var i in output.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries))
         {
             var match = matchRegex.Match(i);
