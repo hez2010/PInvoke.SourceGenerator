@@ -1,6 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <None Remove="NativeLibrary\**" />
     <ProjectReference Include="..\PInvoke.SourceGenerator\PInvoke.SourceGenerator.csproj" OutputItemType="Analyzer" />
   </ItemGroup>
 

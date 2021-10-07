@@ -58,8 +58,12 @@ class SourceGenerator : ISourceGenerator
             if (literalNode is null) continue;
             var classDeclInfo = semanticModel.GetDeclaredSymbol(node.Class);
             if (classDeclInfo is null) continue;
-            var fileName = literalNode.ToString();
-            classes.Add((classDeclInfo, fileName[(fileName.IndexOf("\"") + 1)..].Trim().TrimEnd('"'), fileName));
+            var rawFileName = literalNode.ToString();
+            var fileName = semanticModel.GetConstantValue(literalNode);
+            if (fileName.HasValue && fileName.Value is string str)
+            {
+                classes.Add((classDeclInfo, str, rawFileName));
+            }
 
         }
 
