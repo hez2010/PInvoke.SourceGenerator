@@ -3,5 +3,5 @@ using System;
 
 Console.WriteLine(TestLibrary.Add(3, 4));
 
-[DllFileImport(@"test.dll")]
+[DllFileImport("add.dll")]
 partial class TestLibrary { }

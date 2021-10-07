@@ -28,7 +28,7 @@ class DllFileImportReceiver : ISyntaxReceiver
 [Generator]
 class SourceGenerator : ISourceGenerator
 {
-    private static readonly Regex matchRegex = new(@"\?([_a-zA-Z][_a-zA-Z0-9]*)@@YA([_A-Z]*)(XZ|@Z)", RegexOptions.Compiled);
+    private static readonly Regex matchRegex = new(@"(\d+).*?\?([_a-zA-Z][_a-zA-Z0-9]*)@@YA([_A-Z]*)(XZ|@Z)", RegexOptions.Compiled);
     private static readonly Dictionary<string, string> typeMaps = new()
     {
         ["X"] = "void",
@@ -47,7 +47,7 @@ class SourceGenerator : ISourceGenerator
     private readonly DllFileImportReceiver receiver = new();
     public void Execute(GeneratorExecutionContext context)
     {
-        var classes = new List<(INamedTypeSymbol ClassSymbol, string DllFileName)>();
+        var classes = new List<(INamedTypeSymbol ClassSymbol, string DllFileName, string RawFileName)>();
         foreach (var node in receiver.SyntaxNodes)
         {
             var semanticModel = context.Compilation.GetSemanticModel(node.Class.SyntaxTree);
@@ -59,16 +59,16 @@ class SourceGenerator : ISourceGenerator
             var classDeclInfo = semanticModel.GetDeclaredSymbol(node.Class);
             if (classDeclInfo is null) continue;
             var fileName = literalNode.ToString();
-            classes.Add((classDeclInfo, fileName[(fileName.IndexOf("\"") + 1)..].Trim().TrimEnd('"')));
+            classes.Add((classDeclInfo, fileName[(fileName.IndexOf("\"") + 1)..].Trim().TrimEnd('"'), fileName));
 
         }
 
-        foreach (var (symbol, fileName) in classes)
+        foreach (var (symbol, fileName, rawFileName) in classes)
         {
             var ns = symbol.ContainingNamespace.ToString() ?? "";
             if (ns == "<global namespace>") ns = "";
             var cs = symbol.ToString()[ns.Length..].Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
-            GenerateClass(in context, ns, cs.ToList(), fileName);
+            GenerateClass(in context, ns, cs.ToList(), rawFileName, fileName);
         }
     }
 
@@ -77,10 +77,11 @@ class SourceGenerator : ISourceGenerator
         context.RegisterForSyntaxNotifications(() => receiver);
     }
 
-    private void GenerateClass(in GeneratorExecutionContext context, string ns, List<string> classes, string dllFileName)
+    private void GenerateClass(in GeneratorExecutionContext context, string ns, List<string> classes, string rawFileName, string dllFileName)
     {
         var source = string.IsNullOrEmpty(ns) ?
 @$"using System.Runtime.InteropServices;
+
 {
         string.Join("\n", classes.Select((c, i) =>
         {
@@ -88,7 +89,7 @@ class SourceGenerator : ISourceGenerator
             return $"{prefix}partial class {c}\n{prefix}{{";
         }))
 }
-{GenerateMethods(dllFileName, classes.Count + 1)}
+{GenerateMethods(rawFileName, dllFileName, classes.Count + 1)}
 {
         string.Join("\n", classes.Select((_, i) =>
         {
@@ -97,6 +98,7 @@ class SourceGenerator : ISourceGenerator
         }))
 }" :
 @$"using System.Runtime.InteropServices;
+
 namespace {ns}
 {{
 {
@@ -106,7 +108,7 @@ namespace {ns}
             return $"{prefix}partial class {c}\n{prefix}{{";
         }))
 }
-{GenerateMethods(dllFileName, classes.Count + 1)}
+{GenerateMethods(rawFileName, dllFileName, classes.Count + 1)}
 {
         string.Join("\n", classes.Select((_, i) =>
         {
@@ -118,13 +120,13 @@ namespace {ns}
         context.AddSource(dllFileName.Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries).Last() + ".g.cs", source);
     }
 
-    private string GenerateMethods(string fileName, int nestingLevel)
+    private string GenerateMethods(string rawFileName, string fileName, int nestingLevel)
     {
         var source = new StringBuilder();
         var prefix = string.Concat(Enumerable.Repeat(" ", nestingLevel * 4));
         using var process = Process.Start(new ProcessStartInfo
         {
-            FileName = @"C:\Program Files\Microsoft Visual Studio\2022\Preview\VC\Tools\MSVC\14.30.30528\bin\Hostx64\x64\dumpbin.exe",
+            FileName = @"dumpbin.exe",
             Arguments = $"/EXPORTS \"{fileName}\"",
             RedirectStandardOutput = true,
             UseShellExecute = false
@@ -136,11 +138,11 @@ namespace {ns}
             var match = matchRegex.Match(i);
             if (match.Success)
             {
-                if (match.Groups.Count != 4) continue;
+                if (match.Groups.Count != 5) continue;
                 var sb = new StringBuilder();
-                sb.Append(@$"{prefix}[DllImport(@""{fileName}"", EntryPoint = ""{match.Groups[0].Value}"")] public extern static ");
-                var fn = match.Groups[1].Value;
-                var sig = match.Groups[2].Value;
+                sb.Append(@$"{prefix}[DllImport({rawFileName}, EntryPoint = ""#{match.Groups[1].Value}"")] public extern static ");
+                var fn = match.Groups[2].Value;
+                var sig = match.Groups[3].Value;
                 var index = 0;
                 var span = sig.AsSpan();
 
