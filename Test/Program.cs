@@ -1,10 +1,7 @@
 ﻿using PInvoke.SourceGenerator;
 using System;
 
-Console.WriteLine("test");
+Console.WriteLine(TestLibrary.Add(3, 4));
 
 [DllFileImport(@"test.dll")]
-partial class NativeMethods
-{
-
-}
+partial class TestLibrary { }

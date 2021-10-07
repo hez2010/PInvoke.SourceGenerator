@@ -66,6 +66,7 @@ class SourceGenerator : ISourceGenerator
         foreach (var (symbol, fileName) in classes)
         {
             var ns = symbol.ContainingNamespace.ToString() ?? "";
+            if (ns == "<global namespace>") ns = "";
             var cs = symbol.ToString()[ns.Length..].Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries);
             GenerateClass(in context, ns, cs.ToList(), fileName);
         }
@@ -78,7 +79,24 @@ class SourceGenerator : ISourceGenerator
 
     private void GenerateClass(in GeneratorExecutionContext context, string ns, List<string> classes, string dllFileName)
     {
-        var source = @$"using System.Runtime.InteropServices;
+        var source = string.IsNullOrEmpty(ns) ?
+@$"using System.Runtime.InteropServices;
+{
+        string.Join("\n", classes.Select((c, i) =>
+        {
+            var prefix = string.Concat(Enumerable.Repeat(" ", i * 4));
+            return $"{prefix}partial class {c}\n{prefix}{{";
+        }))
+}
+{GenerateMethods(dllFileName, classes.Count + 1)}
+{
+        string.Join("\n", classes.Select((_, i) =>
+        {
+            var prefix = string.Concat(Enumerable.Repeat(" ", (classes.Count - i - 1) * 4));
+            return $"{prefix}}}";
+        }))
+}" :
+@$"using System.Runtime.InteropServices;
 namespace {ns}
 {{
 {
@@ -106,7 +124,7 @@ namespace {ns}
         var prefix = string.Concat(Enumerable.Repeat(" ", nestingLevel * 4));
         using var process = Process.Start(new ProcessStartInfo
         {
-            FileName = @"dumpbin.exe",
+            FileName = @"C:\Program Files\Microsoft Visual Studio\2022\Preview\VC\Tools\MSVC\14.30.30528\bin\Hostx64\x64\dumpbin.exe",
             Arguments = $"/EXPORTS \"{fileName}\"",
             RedirectStandardOutput = true,
             UseShellExecute = false
