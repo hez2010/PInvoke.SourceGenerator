@@ -176,11 +176,11 @@ namespace {ns}
 
         var sb = new StringBuilder();
         var seek = 0;
-        var isPointer = false;
-        if (span.StartsWith("PEA".AsSpan()))
+        var pointer = 0;
+        while (span[seek..].StartsWith("PEA".AsSpan()))
         {
-            isPointer = true;
-            seek = 3;
+            pointer++;
+            seek += 3;
         }
 
         foreach (var i in typeMaps)
@@ -194,7 +194,7 @@ namespace {ns}
         }
 
         if (sb.Length == 0) throw new InvalidOperationException("Unrecognized type.");
-        if (isPointer) sb.Append("*");
+        sb.Append(string.Concat(Enumerable.Repeat("*", pointer)));
         type = sb.ToString();
 
         span = span[seek..];
